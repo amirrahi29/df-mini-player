@@ -1,48 +1,66 @@
 #include "DFRobotDFPlayerMini.h"
 
 // Use HardwareSerial on ESP32
-HardwareSerial mySerial(2); // Using UART2 (TX2: GPIO16, RX2: GPIO17)
+HardwareSerial mySerial(2); // TX2: GPIO16, RX2: GPIO17
 DFRobotDFPlayerMini player;
 
 void setup() {
   Serial.begin(115200);
-  mySerial.begin(9600, SERIAL_8N1, 16, 17);  // Change to (14, 13) if needed
-  delay(1000);
+  mySerial.begin(9600, SERIAL_8N1, 16, 17);
+
+  delay(2000);  // Give DFPlayer some time to power up
 
   Serial.println("\n🎵 Initializing DFPlayer Mini...");
 
-  if (player.begin(mySerial)) {
-    Serial.println("✅ DFPlayer Mini is ONLINE!");
-
-    // Set volume (0 to 30)
-    player.volume(20);
-    Serial.println("🔊 Volume set to 20");
-
-    // Check if SD Card is detected and count MP3 files
-    int files = player.readFileCounts();
-    Serial.print("📂 Total MP3 Files Found: ");
-    Serial.println(files);
-
-    if (files == 0) {
-      Serial.println("❌ No MP3 files found! Check SD card and file names.");
-    } else {
-      Serial.println("✅ SD Card is working!");
-
-      // Play the first track automatically at startup
-      Serial.println("🎶 Playing first track automatically...");
-      player.play(1);
+  bool playerReady = false;
+  int retryCount = 10;  // Increase retry count
+  for (int i = 0; i < retryCount; i++) {
+    if (player.begin(mySerial)) {
+      playerReady = true;
+      break;
     }
-
-    Serial.println("\n💡 Type a number (1-5) in Serial Monitor to play a specific song.");
-
-  } else {
-    Serial.println("⚠ DFPlayer Mini failed to initialize! Check wiring and SD card.");
+    Serial.println("⚠ DFPlayer initialization failed. Retrying...");
+    delay(2000);  // Increase delay before retrying
   }
+
+  if (!playerReady) {
+    Serial.println("❌ DFPlayer still not responding. Check power, wiring, and SD card.");
+    Serial.println("🔄 Attempting to play track 1 without initialization...");
+
+    // Attempt direct serial command to play track 1
+    mySerial.write(0x7E); mySerial.write(0xFF); mySerial.write(0x06);
+    mySerial.write(0x03); mySerial.write(0x00); mySerial.write(0x00);
+    mySerial.write(0x01); mySerial.write(0xEF);  // Play track 1 command
+
+    Serial.println("🎶 Trying to play Track 1 directly...");
+    return;  // Skip further setup
+  }
+
+  Serial.println("✅ DFPlayer Mini is ONLINE!");
+
+  // Set volume (0 to 30)
+  player.volume(20);
+  Serial.println("🔊 Volume set to 20");
+
+  // Check if SD Card is detected and count MP3 files
+  int files = player.readFileCounts();
+  Serial.print("📂 Total MP3 Files Found: ");
+  Serial.println(files);
+
+  if (files == 0) {
+    Serial.println("❌ No MP3 files found! Check SD card and file names.");
+  } else {
+    Serial.println("✅ SD Card is working!");
+    Serial.println("🎶 Playing first track automatically...");
+    player.play(1);
+  }
+
+  Serial.println("\n💡 Type a number (1-5) in Serial Monitor to play a specific song.");
 }
 
 void loop() {
   if (Serial.available()) {
-    String userInput = Serial.readStringUntil('\n'); // Read user input until Enter key
+    String userInput = Serial.readStringUntil('\n'); // Read user input
     userInput.trim();  // Remove spaces and newlines
 
     if (userInput.length() > 0) { // Ensure input is not empty
