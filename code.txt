@@ -1,0 +1,76 @@
+#include "DFRobotDFPlayerMini.h"
+
+// Use HardwareSerial on ESP32
+HardwareSerial mySerial(2); // Using UART2 (TX2: GPIO16, RX2: GPIO17)
+DFRobotDFPlayerMini player;
+
+void setup() {
+  Serial.begin(115200);
+  mySerial.begin(9600, SERIAL_8N1, 16, 17);  // Change to (14, 13) if needed
+  delay(1000);
+
+  Serial.println("\n🎵 Initializing DFPlayer Mini...");
+
+  if (player.begin(mySerial)) {
+    Serial.println("✅ DFPlayer Mini is ONLINE!");
+
+    // Set volume (0 to 30)
+    player.volume(20);
+    Serial.println("🔊 Volume set to 20");
+
+    // Check if SD Card is detected and count MP3 files
+    int files = player.readFileCounts();
+    Serial.print("📂 Total MP3 Files Found: ");
+    Serial.println(files);
+
+    if (files == 0) {
+      Serial.println("❌ No MP3 files found! Check SD card and file names.");
+    } else {
+      Serial.println("✅ SD Card is working!");
+
+      // Play the first track automatically at startup
+      Serial.println("🎶 Playing first track automatically...");
+      player.play(1);
+    }
+
+    Serial.println("\n💡 Type a number (1-5) in Serial Monitor to play a specific song.");
+
+  } else {
+    Serial.println("⚠ DFPlayer Mini failed to initialize! Check wiring and SD card.");
+  }
+}
+
+void loop() {
+  if (Serial.available()) {
+    String userInput = Serial.readStringUntil('\n'); // Read user input until Enter key
+    userInput.trim();  // Remove spaces and newlines
+
+    if (userInput.length() > 0) { // Ensure input is not empty
+      int track = userInput.toInt(); // Convert input to an integer
+
+      if (track >= 1 && track <= 5) {  // Valid track numbers (1-5)
+        Serial.print("🎶 Playing Track: ");
+        Serial.println(track);
+        player.play(track);  // Play the selected track
+        delay(1000);  // Allow playback to start
+
+        // Check if the track is actually playing
+        int status = player.readState();
+        Serial.print("🔎 DFPlayer Status: ");
+        Serial.println(status); // 1 = Playing, 0 = Stopped, 2 = Paused
+
+      } else {
+        Serial.println("❌ Invalid track number! Type a number between 1-5.");
+      }
+    }
+  }
+
+  // Check if a track has finished playing
+  if (player.available()) {
+    int status = player.readType();
+    
+    if (status == DFPlayerPlayFinished) {
+      Serial.println("✅ Track finished. Type a number (1-5) to play a new song.");
+    }
+  }
+}
